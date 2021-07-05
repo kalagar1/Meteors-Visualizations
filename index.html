@@ -1,0 +1,544 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Meteors Visualization</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="https://d3js.org/topojson.v3.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="styles.css" />
+</head>
+
+<body>
+  <div id="mapIntroText">
+    <h3 id="mapHeader">Map of Meteorite Strikes</h3>
+    <p>A meteorite is a solid piece of debris from an object originating in
+      outer space that collides with Earth. Meteorites are classified as either found or fell, meaning they are either
+      found on
+      the ground or observered streaking through the sky. Observered meteorites
+      therefore
+      tend to be concentrated in areas with high human population densities such as Europe, Japan, India, and parts of
+      the
+      US.</p>
+    <p>Circles are sized according to the meteorites mass in grams. Hover over a meteorite for more information.</p>
+  </div>
+
+  <div id="mapContainer">
+
+    <div id="mapDiv">
+      <svg id="map" height="550" width="900">
+      </svg>
+    </div>
+
+    <div id="mapFilters">
+      <div id="meteorFacts">
+        <span class="label" id="name_label"> </span>
+        <br>
+        <span class="label" id="type_label"> </span>
+        <br>
+        <span class="label" id="year_label"> </span>
+        <br>
+        <span class="label" id="class_label"> </span>
+        <br>
+        <span class="label" id="mass_label"> </span>
+      </div>
+
+      <div id="filtersText">
+        <p>Filters: </p>
+        <p>1) Select the meteor type</p>
+        <p>2) Click and drag to select a range</p>
+        <p>3) Drag selection to move range</p>
+        <p>4) Pan and zoom on map as needed</p>
+      </div>
+      <div id="mapTypeFilters"></div>
+      <div id="controls"></div>
+      <div id="clearControls">
+        <div id="clearFilters"></div>
+        <div id="clearZoom"></div>
+      </div>
+    </div>
+
+
+  </div>
+
+  <div id="mapIntroText">
+    <h3 id="mapHeader">Potential Future Meteorite Strikes</h3>
+    <p>Roughly 25 million meteoroids and other space debris enter Earths atmosphere
+      daily. This visualization predicts the hazardous impact effects of notable meteors and asteroids, that are in
+      space, based on the
+      Palermo Scale. The Palermo Scale is used by astronomers to rate the potential hazard of impact of a near Earth
+      object.
+      In it, values close to 0 have a high likelihood of happening whereas a value further away denotes a lower risk.
+      Therefore, meteors that have a Palermo Score close to 0 and a high diameter pose a significant harm to Earth.
+    </p>
+    <p>Circles are colored according to the Palermo scale. Hover over a meteorite for more information.</p>
+  </div>
+
+
+  <div id="predContainer">
+    <svg id="prediction" height="400" width="1200" style="margin:10px">
+      <text id="xlabel" class="default-font" x="340" y="370" alignment-baseline="hanging"></text>
+      <text id="ylabel" class="default-font" x="-255" y="20"></text>
+    </svg>
+
+    <div id="factContainer">
+      <div id="meteorFacts">
+        <span class="label" id="future_name"> </span>
+        <br>
+        <span class="label" id="future_probability"> </span>
+        <br>
+        <span class="label" id="future_velocity"> </span>
+        <br>
+        <span class="label" id="future_palermo"> </span>
+        <br>
+      </div>
+
+      <div id="predZoomDiv">
+        <div id="clearPredZoom"></div>
+      </div>
+    </div>
+
+
+  </div>
+
+
+
+  <script>
+    const requestData = async function () {
+      let map = d3.select("svg#map");
+      let width = map.attr("width");
+      let height = map.attr("height");
+      var meteors = await d3.csv("meteorite-landings.csv");
+      var world = await d3.json("world.topojson");
+
+      //filtering meteors
+      meteors = meteors.filter(d => {
+        return !(d['mass'] === "" || d["mass"] <= 300 || d["reclat"] === "" || d["reclong"] === "")
+      });
+
+      // cleaning meteors
+      meteors.forEach(d => {
+        d['mass'] = parseInt(d['mass']);
+        d['reclat'] = parseFloat(d['reclat']);
+        d['reclong'] = parseFloat(d['reclong']);
+        d['year'] = parseFloat(d['year']);
+        d["id"] = parseInt(d['id']);
+      });
+
+      // sort meteors largest to smallest
+      meteors = meteors.sort((a, b) => {
+        if (a.mass > b.mass) {
+          return -1
+        } else return 1
+      })
+
+
+      // extent without filtering mass
+      const meteorExtent = d3.extent(meteors, d => d.mass);
+
+      //remove antarctica from topojson
+      world.objects.countries.geometries = world.objects.countries.geometries.filter(d => {
+        return !(d.properties.name === "Antarctica");
+      });
+
+
+      // topojson countries and mesh
+      var countries = topojson.feature(world, world.objects.countries);
+      var countriesMesh = topojson.mesh(world, world.objects.countries);
+
+
+      var filters = {};
+
+      function meteorPassesFilters(meteor) {
+        let passed = true;
+        Object.values(filters).forEach(f => {
+          passed = f(meteor) && passed;
+        });
+        return passed;
+      }
+
+      console.log("world", world);
+      console.log("countries", countries);
+      console.log("countriesMesh", countriesMesh);
+      console.log("meteors", meteors);
+
+      var projection = d3.geoMercator().fitSize([width, height], countries);
+      var path = d3.geoPath().projection(projection);
+
+      let viewport = map.append("g");
+
+      viewport.selectAll("path.countries").data(countries.features)
+        .join("path")
+        .attr("class", "country")
+        .attr("fill", "lightgray")
+        .attr("d", path);
+
+      viewport.append("path").datum(countriesMesh)
+        .attr("class", "outline")
+        .attr("stroke", "gray")
+        .attr("stroke-width", ".5px")
+        .attr("fill", "none")
+        .attr("d", path);
+
+      const meteorScale = d3.scaleSqrt()
+        .domain(meteorExtent)
+        .range([0.5, 25]);
+
+
+      const typeScale = d3.scaleOrdinal()
+        .domain(["Found", "Fell", "All"])
+        .range(["Orange", "Red", "Black"]);
+
+
+      // pan and zoom stuff
+      var zoom = d3.zoom()
+        .scaleExtent([1, 10])
+        .on("zoom", mapZoomed);
+
+      map.call(zoom)
+      map.call(zoom.transform, d3.zoomIdentity);
+
+      function mapZoomed({ transform }) {
+        viewport.attr("transform", transform.toString());
+
+        viewport.select(".outline")
+          .style("stroke-width", 1 / transform.k);
+      }
+
+
+      function updateMeteors(meteors) {
+
+        let filteredMeteors = meteors.filter(d => meteorPassesFilters(d));
+        console.log("filtered meteors", filteredMeteors);
+
+        let map_meteors = viewport.selectAll("circle").data(filteredMeteors)
+          .join("circle")
+          .attr("r", d => meteorScale(d.mass))
+          .attr("fill", d => typeScale(d.fall))
+          .attr("opacity", 0.5)
+          .attr("mass", d => d["mass"])
+          .attr("name", d => d["name"])
+          .attr("year", d => d["year"])
+          .attr("type", d => d["fall"])
+          .attr("class", d => d["recclass"])
+          .attr("cx", d => projection([d.reclong, d.reclat])[0])
+          .attr("cy", d => projection([d.reclong, d.reclat])[1])
+          .on("mouseover", function () {
+            d3.select(this).raise();
+
+            d3.select(this)
+              .transition().duration(100)
+              .attr("r", meteorScale(d3.select(this).attr("mass")) * 1.35)
+              .attr("opacity", 1);
+
+            d3.select("#name_label").text("Name: " + d3.select(this).attr("name"));
+            d3.select("#year_label").text("Year: " + d3.select(this).attr("year"));
+            d3.select("#type_label").text("Type: " + d3.select(this).attr("type"));
+            d3.select("#mass_label").text("Mass (g): " + d3.format(".2s")(d3.select(this).attr("mass")));
+            d3.select("#class_label").text("Class: " + d3.select(this).attr("class"));
+          }).on("mouseout", function () {
+            d3.select(this)
+              .transition().duration(100)
+              .attr("r", meteorScale(d3.select(this).attr("mass")))
+              .attr("opacity", 0.6);
+            d3.select("#name_label").text("");
+            d3.select("#year_label").text("");
+            d3.select("#type_label").text("");
+            d3.select("#mass_label").text("");
+            d3.select("#class_label").text("");
+          });
+
+
+
+
+      }
+
+
+      updateMeteors(meteors);
+
+
+
+      console.log(typeScale.domain())
+      typeScale.domain().forEach(function (d, i) {
+        d3.select("#mapTypeFilters")
+          .append("span")
+          .text(d)
+          .style("color", typeScale(d))
+          .on("click", function () {
+            let filterFunc = m => true
+            if (!(d === "All")) {
+              filterFunc = m => m["fall"] === d;
+            }
+            filters["type"] = filterFunc;
+            updateMeteors(meteors);
+          })
+      });
+
+      function makeSlider(container, label, attribute, sliderWidth, sliderHeight) {
+
+        let values = meteors.map(d => d[attribute]);
+
+        let minMax = d3.extent(values);
+        let xScale = d3.scaleLinear().domain(minMax)
+          .range([10, sliderWidth - 10]);
+
+        if (label === "Mass") {
+          xScale = d3.scaleSqrt().domain(minMax)
+            .range([10, sliderWidth - 10]);
+        }
+
+        let xAxis = d3.axisBottom(xScale).tickFormat(d3.format("")).ticks(5);
+
+        if (label === "Mass") {
+          xAxis = d3.axisBottom(xScale).tickFormat(d3.format(".2s")).ticks(5);
+        }
+
+        let wrapper = container.append("div").attr("class", "control");
+        wrapper.append("div").text(label);
+        let canvas = wrapper.append("svg").attr("width", sliderWidth)
+          .attr("height", sliderHeight + 20)
+          .attr("attribute", attribute);
+        let areaLayer = canvas.append("g");
+        canvas.append("g").attr("transform", `translate(0,${sliderHeight})`)
+          .call(xAxis);
+
+
+        let filterFunc = d => true;
+        filters[attribute] = filterFunc;
+
+
+        var brush = d3.brushX().extent([[10, 0],
+        [sliderWidth - 10, sliderHeight]])
+          .on("brush end", brushMoved)
+
+
+
+        function brushMoved(event) {
+          if (event.selection !== null) {
+            let start = xScale.invert(event.selection[0]);
+            let end = xScale.invert(event.selection[1]);
+
+            let filterFunc = d => d[attribute] >= start && d[attribute] <= end;
+            filters[attribute] = filterFunc;
+
+            updateMeteors(meteors);
+          }
+          else {
+            let filterFunc = d => true;
+            filters[attribute] = filterFunc;
+
+            updateMeteors(meteors);
+          }
+        }
+        canvas.append("g").attr("class", "brush").call(brush).call(brush.move, [10, sliderWidth - 10]);
+      }
+      let controls = d3.select("#controls");
+
+      makeSlider(controls, "Year", "year", 280, 30);
+      makeSlider(controls, "Mass", "mass", 280, 30);
+
+
+      d3.select("#clearFilters")
+        .append("span")
+        .text("Clear Filters")
+        .style("color", "black")
+        .on("click", function () {
+          filters = {};
+          updateMeteors(meteors);
+          controls.selectAll("div").remove();
+          makeSlider(controls, "Year", "year", 280, 30);
+          makeSlider(controls, "Mass", "mass", 280, 30);
+        })
+
+      d3.select("#clearZoom")
+        .append("span")
+        .text("Reset Zoom")
+        .style("color", "black")
+        .on("click", function () {
+          map.call(zoom.transform, d3.zoomIdentity);
+        })
+
+
+
+    }
+    requestData();
+
+
+
+    // impacts viz
+    d3.csv("impacts.csv").then((data) => {
+      console.log(data)
+      const svg = d3.select("svg#prediction");
+
+      const width = svg.attr("width") - 400;
+      const height = svg.attr("height");
+      const margin = { top: 20, right: 20, bottom: 65, left: 65 };
+
+      let annotations = svg.append("g").attr("id", "annotations");
+
+      const chartWidth = width - margin.left - margin.right;
+      const chartHeight = height - margin.top - margin.bottom;
+
+      const palermoExtent = d3.extent(data, d => d["Cumulative Palermo Scale"]);
+      console.log(palermoExtent)
+      // const reverse = [palermoExtent[1], palermoExtent[0]];
+      const reverse = [-11, -1];
+
+      console.log(reverse);
+      const palermoScale = d3.scaleLinear().domain(reverse).range([0, chartWidth]);
+
+      const diameterExtent = d3.extent(data, d => d['Asteroid Diameter (km)']);
+      const diameterScale = d3.scaleSqrt().domain(diameterExtent).range([chartHeight, 0]);
+
+      const fillScale = d3.scaleSequential(reverse, d3.interpolateYlOrRd);
+
+      //x-axis
+      let bottomAxis = d3.axisBottom(palermoScale)
+        .tickFormat(d3.format(""));
+      let bottomGridlines = d3.axisBottom(palermoScale)
+        .tickSize(-chartHeight - 10)
+        .tickFormat("")
+
+      //x-axis label
+      d3.select("#xlabel").text("Palermo Scale Rating");
+
+      annotations.append("g")
+        .attr("class", "x-axis")
+        .attr("transform", "translate(" + margin.left + "," + (chartHeight + margin.top + 10) + ")")
+        .call(bottomAxis);
+
+      annotations.append("g")
+        .attr("class", "x-gridlines")
+        .attr("transform", "translate(" + margin.left + "," + (chartHeight + margin.top + 10) + ")")
+        .call(bottomGridlines);
+
+      //y-axis
+      let leftAxis = d3.axisLeft(diameterScale)
+        .ticks(5)
+        .tickFormat(d3.format(""))
+
+      let leftGridlines = d3.axisLeft(diameterScale)
+        .tickSize(-chartWidth - 10)
+        .tickFormat("")
+        .ticks(5)
+
+      //y-axis label; function rotates the text
+      d3.select("#ylabel").text("Asteroid Diameter (km)").attr("transform", function (d) {
+        return "rotate(-90)"
+      });
+
+      annotations.append("g")
+        .attr("class", "y-axis")
+        .attr("transform", "translate(" + (margin.left - 10) + "," + margin.top + ")")
+        .call(leftAxis)
+
+      annotations.append("g")
+        .attr("class", "y-gridlines")
+        .attr("transform", "translate(" + (margin.left - 10) + "," + margin.top + ")")
+        .call(leftGridlines);
+
+      //chart region
+      let chartRegion = svg.append("g").attr("id", "points")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      let viewport = chartRegion.append("g");
+
+      //creating circles
+      viewport.selectAll("circle").data(data)
+        .join("circle")
+        .attr("cx", d => palermoScale(d['Cumulative Palermo Scale']))
+        .attr("cy", d => diameterScale(d['Asteroid Diameter (km)']))
+        .attr("fill", d => fillScale(d["Cumulative Palermo Scale"])) //insert color scale
+        .attr("r", 4)
+        .attr("opacity", 0.7)
+        .attr("stroke", "black")
+        .attr("stroke-width", 1)
+        .attr("name", d => d['Object Name'])
+        .attr("probability", d => d['Cumulative Impact Probability'])
+        .attr("velocity", d => d["Asteroid Velocity"])
+        .attr("palermo", d => d["Cumulative Palermo Scale"])
+        .on("mouseover", function () {
+          d3.select(this).raise()
+            .transition().duration(320)
+            .attr("stroke", "black")
+            .attr("stroke-width", 3)
+            .attr("r", 8)
+            .attr("opacity", 1);
+          d3.select("#future_name").text("Meteor Name: " + d3.select(this).attr("name"));
+          d3.select("#future_probability").text("Cumulative Impact Probability (%): " + d3.select(this).attr("probability"));
+          d3.select("#future_velocity").text("Meteor Velocity: " + d3.select(this).attr("velocity"));
+          d3.select("#future_palermo").text("Palermo Scale Rating: " + d3.select(this).attr("palermo"));
+        })
+        .on("mouseout", function () {
+          d3.select(this)
+            .transition().duration(250)
+            .attr("r", 4)
+            .attr("stroke-width", 1)
+            .attr("opacity", 0.7)
+
+          d3.select("#future_name").text("");
+          d3.select("#future_probability").text("");
+          d3.select("#future_velocity").text("");
+          d3.select("#future_palermo").text("");
+        });
+
+      d3.select("#prediction").attr("width", 800);
+
+      var plotZoom = d3.zoom().on("zoom", plotZoomed);
+      svg.call(plotZoom);
+      svg.call(plotZoom.transform, d3.zoomIdentity);
+
+      d3.select("#clearPredZoom")
+        .append("span")
+        .text("Reset Zoom")
+        .style("color", "black")
+        .on("click", function () {
+          svg.call(plotZoom.transform, d3.zoomIdentity);
+        })
+
+
+      function plotZoomed({ transform }) {
+
+        console.log(transform);
+        console.log(transform.toString());
+
+        viewport.attr("transform", transform);
+
+        // update the scales on the axes/gridlines
+        // rescale does not modify the source scale
+        leftAxis.scale(transform.rescaleY(diameterScale))
+        bottomAxis.scale(transform.rescaleX(palermoScale))
+        leftGridlines.scale(transform.rescaleY(diameterScale))
+        bottomGridlines.scale(transform.rescaleX(palermoScale))
+
+        // apply new scaled axes (no need for transition since zoom triggers so many events)
+        d3.select("g.y-axis").call(leftAxis);
+        d3.select("g.x-axis").call(bottomAxis);
+        d3.select("g.y-gridlines").call(leftGridlines);
+        d3.select("g.x-gridlines").call(bottomGridlines);
+      }
+
+      svg.append("defs").append("clipPath")
+        .attr("id", "chartClip")
+        .append("rect").attr("x", -10)
+        .attr("y", 0)
+        .attr("width", chartWidth + 10)
+        .attr("height", chartHeight + 10);
+
+      chartRegion.attr("clip-path", "url(#chartClip)");
+
+
+
+    });
+
+
+
+  </script>
+  </p>
+
+</body>
+
+</html>
+
+
+<!-- note: referenced lectures and notes for some elements of this project -->

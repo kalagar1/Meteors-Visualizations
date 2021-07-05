@@ -1,0 +1,180 @@
+
+body {
+  font-family: 'Exo 2', sans-serif;
+}
+
+
+#mapDiv {
+  width: 65%;
+float: left;
+}
+
+#map {
+  width: 100%;
+  text-align: center;
+}
+#mapContainer {
+  width: 90%;
+  text-align: center;
+  margin: auto;
+  margin-bottom: 100px;
+  height: 500px;
+}
+
+#mapFilters {
+  width: 35%;
+  float: right;
+}
+
+#mapTypeFilters {
+  text-align: center;
+  margin: auto;
+}
+
+#clearControls {
+  text-align: center;
+  margin: auto;
+  margin-bottom: 15px;
+}
+
+#controls {
+  text-align: center;
+  margin: 10px;
+  text-decoration: underline;
+}
+
+#meteorFacts {
+  text-align: center;
+  margin: auto;
+  margin: 10px;
+  margin-top: 20px;
+  height: 150px;
+}
+
+#mapTypeFilters span {
+  margin: 6px;
+}
+
+#filtersText {
+  margin-top: 15px;
+  margin-bottom: 15px;
+}
+
+#filtersText p{
+  margin: 3px;
+  text-align: center;
+}
+
+#meteorFacts {
+  font-size: 20px;
+}
+
+#mapIntroText {
+  width: 80%;
+  text-align: center;
+  margin: auto;
+}
+
+#ylabel {
+  font-family: 'Tahoma', 'Open Sans', 'Helvetica Neue';
+  font-weight: bold;
+}
+
+#xlabel {
+  font-family: 'Tahoma', 'Open Sans', 'Helvetica Neue';
+  font-weight: bold;
+}
+
+#panel {
+  background-color: gold;
+  border: black solid 2px;
+  opacity: 0.35;
+  width: 350px;
+  height: 150px;
+  position: absolute;
+  top: 40px;
+  left: 815px;
+  border-radius: 10px;
+}
+
+#info-panel {
+  background-color: lightblue;
+  border: black solid 2px;
+  opacity: 0.35;
+  width: 350px;
+  height: 170px;
+  position: absolute;
+  top: 205px;
+  left: 815px;
+  border-radius: 10px;
+}
+
+#panel-title {
+  margin-top: 5px;
+  margin-left: 65px;
+  font-family: 'Tahoma', 'Open Sans', 'Helvetica Neue';
+  font-weight: bold;
+}
+
+#info-panel-title {
+  margin-top: 5px;
+  margin-left: 120px;
+  font-family: 'Tahoma', 'Open Sans', 'Helvetica Neue';
+  font-weight: bold;
+}
+
+.default-font {
+  font-family: 'Tahoma', 'Open Sans', 'Helvetica Neue';
+}
+
+.adjust-margin {
+  margin-left: 19px;
+  margin-right: 3px;
+  margin-top: -10px;
+  font-size: 14px;
+}
+
+.x-gridlines {
+  color: grey;
+}
+
+.top-stack {
+  position: absolute;
+  z-index: 10;
+}
+
+.y-gridlines {
+  color: grey;
+}
+
+#predContainer {
+  width: 90%;
+  text-align: center;
+  margin: auto;
+  margin-bottom: 100px;
+  margin-top: 100px;
+}
+
+#predContainer {
+  width: 90%;
+  text-align: center;
+  margin: auto;
+  margin-bottom: 100px;
+  height: 500px;
+}
+
+#prediction {
+  float: left;
+}
+
+
+#factContainer {
+  float: right;
+  text-align: center;
+  margin-right: 50px;
+  width: 450px;
+}
+
+#factContainer div {
+  height: 330px;
+}
